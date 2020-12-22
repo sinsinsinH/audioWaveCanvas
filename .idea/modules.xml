@@ -2,10 +2,9 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/audioCanvasWave.iml" filepath="$PROJECT_DIR$/audioCanvasWave.iml" />
-      <module fileurl="file://$PROJECT_DIR$/audioWaveCanvas.iml" filepath="$PROJECT_DIR$/audioWaveCanvas.iml" />
-      <module fileurl="file://$PROJECT_DIR$/wavelibrary/wavelibrary.iml" filepath="$PROJECT_DIR$/wavelibrary/wavelibrary.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/audioWaveCanvas.iml" filepath="$PROJECT_DIR$/.idea/audioWaveCanvas.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/app/audioWaveCanvas.app.iml" filepath="$PROJECT_DIR$/.idea/modules/app/audioWaveCanvas.app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/wavelibrary/audioWaveCanvas.wavelibrary.iml" filepath="$PROJECT_DIR$/.idea/modules/wavelibrary/audioWaveCanvas.wavelibrary.iml" />
     </modules>
   </component>
 </project>

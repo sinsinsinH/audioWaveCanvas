@@ -13,10 +13,12 @@ import android.os.Message;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.cokus.audiocanvaswave.util.MusicSimilarityUtil;
 import com.cokus.audiocanvaswave.util.U;
 import com.cokus.wavelibrary.draw.WaveCanvas;
@@ -24,6 +26,7 @@ import com.cokus.wavelibrary.utils.SamplePlayer;
 import com.cokus.wavelibrary.utils.SoundFile;
 import com.cokus.wavelibrary.view.WaveSurfaceView;
 import com.cokus.wavelibrary.view.WaveformView;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -39,21 +42,25 @@ import permissions.dispatcher.RuntimePermissions;
 
 
 /**
- *@author:cokus
- *@email:czcoku@gmail.com
- *
- * 根据自己研究发现sfv不适合做这个波形实时绘制的例子，因为每次清屏要重新绘制，所以我想了想为啥不用view呢？
+ * @author:cokus
+ * @email:czcoku@gmail.com 根据自己研究发现sfv不适合做这个波形实时绘制的例子，因为每次清屏要重新绘制，所以我想了想为啥不用view呢？
  * 期待吧。
  */
 @RuntimePermissions
 public class MainActivity extends AppCompatActivity {
 
-    @BindView(R.id.wavesfv) WaveSurfaceView waveSfv;
-    @BindView(R.id.switchbtn) Button switchBtn;
-    @BindView(R.id.status)TextView status;
-    @BindView(R.id.waveview)WaveformView waveView;
-    @BindView(R.id.play)Button playBtn;
-    @BindView(R.id.socreaudio)Button scoreBtn;
+    private static final String TAG = "MainActivity";
+    @BindView(R.id.wavesfv)
+    WaveSurfaceView waveSfv;
+    @BindView(R.id.switchbtn)
+    Button switchBtn;
+    @BindView(R.id.status)
+    TextView status;
+    @BindView(R.id.waveview)
+    WaveformView waveView;
+    @BindView(R.id.play)
+    Button playBtn;
+
 
     private static final int FREQUENCY = 16000;// 设置音频采样率，44100是目前的标准，但是某些设备仍然支持22050，16000，11025
     private static final int CHANNELCONGIFIGURATION = AudioFormat.CHANNEL_IN_MONO;// 设置单声道声道
@@ -62,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
     private int recBufSize;// 录音最小buffer大小
     private AudioRecord audioRecord;
     private WaveCanvas waveCanvas;
-    private String mFileName = "test";//文件名
+    private String mFileName = "device_check";//文件名
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setFormat(PixelFormat.TRANSLUCENT);
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-        if(waveSfv != null) {
+        if (waveSfv != null) {
             waveSfv.setLine_off(42);
             //解决surfaceView黑色闪动效果
             waveSfv.setZOrderOnTop(true);
@@ -81,44 +88,44 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    @OnClick({R.id.switchbtn,R.id.play,R.id.socreaudio})
-    void click(View view){
+    @OnClick({R.id.switchbtn, R.id.play})
+    void click(View view) {
         switch (view.getId()) {
             case R.id.switchbtn:
-            if (waveCanvas == null || !waveCanvas.isRecording) {
-                status.setText("录音中...");
-                switchBtn.setText("停止录音");
-                waveSfv.setVisibility(View.VISIBLE);
-                waveView.setVisibility(View.INVISIBLE);
-                initAudio();
-                startAudio();
-
-            } else {
-                status.setText("停止录音");
-                switchBtn.setText("开始录音");
-                waveCanvas.Stop();
-                waveCanvas = null;
-                initWaveView();
-            }
+                onPausePlayer();
+                if (waveCanvas == null || !waveCanvas.isRecording) {
+                    status.setText("录音中...");
+                    switchBtn.setText("停止录音");
+                    waveSfv.setVisibility(View.VISIBLE);
+                    waveView.setVisibility(View.INVISIBLE);
+                    initAudio();
+                    startAudio();
+                } else {
+                    status.setText("停止录音");
+                    switchBtn.setText("开始录音");
+                    waveCanvas.Stop();
+                    waveCanvas = null;
+                    initWaveView();
+                }
                 break;
             case R.id.play:
-                   onPlay(0);//播放 从头开始播放
-                break;
-            case R.id.socreaudio:
-                float sim = 0;
-                try {
-                    // new FileInputStream(new File(DATA_DIRECTORY + mFileName + ".wav"))
-                    sim = MusicSimilarityUtil.getScoreByCompareFile(getResources().getAssets().open("coku1.wav"), getResources().getAssets().open("coku2.wav"));
-                } catch (IOException e) {
-                    e.printStackTrace();
+                if (waveCanvas != null && waveCanvas.isRecording) {
+                    return;
                 }
-                Toast.makeText(MainActivity.this,sim+"",Toast.LENGTH_LONG).show();
+                if (mPlayer == null) {
+                    return;
+                }
+                if (mPlayer.isPlaying()) {
+                    onPausePlayer();
+                } else {
+                    onPlay(0);//播放 从头开始播放
+                }
                 break;
         }
     }
 
-    private void  initWaveView(){
-     loadFromFile();
+    private void initWaveView() {
+        loadFromFile();
     }
 
     File mFile;
@@ -126,7 +133,10 @@ public class MainActivity extends AppCompatActivity {
     SoundFile mSoundFile;
     boolean mLoadingKeepGoing;
     SamplePlayer mPlayer;
-    /** 载入wav文件显示波形 */
+
+    /**
+     * 载入wav文件显示波形
+     */
     private void loadFromFile() {
         try {
             Thread.sleep(300);//让文件写入完成后再载入波形 适当的休眠下
@@ -139,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
         mLoadSoundFileThread = new Thread() {
             public void run() {
                 try {
-                    mSoundFile = SoundFile.create(mFile.getAbsolutePath(),null);
+                    mSoundFile = SoundFile.create(mFile.getAbsolutePath(), null);
                     if (mSoundFile == null) {
                         return;
                     }
@@ -164,9 +174,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
     float mDensity;
-    /**waveview载入波形完成*/
+
+    /**
+     * waveview载入波形完成
+     */
     private void finishOpeningSoundFile() {
         waveView.setSoundFile(mSoundFile);
         DisplayMetrics metrics = new DisplayMetrics();
@@ -178,7 +190,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 开始录音
      */
-    private void startAudio(){
+    private void startAudio() {
         waveCanvas = new WaveCanvas();
         waveCanvas.baseLine = waveSfv.getHeight() / 2;
         waveCanvas.Start(audioRecord, recBufSize, waveSfv, mFileName, U.DATA_DIRECTORY, new Handler.Callback() {
@@ -192,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 初始化权限
      */
-    public void initPermission(){
+    public void initPermission() {
         MainActivityPermissionsDispatcher.initAudioWithCheck(this);
 
     }
@@ -201,8 +213,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 初始化录音  申请录音权限
      */
-    @NeedsPermission({Manifest.permission.RECORD_AUDIO,Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE})
-    public void initAudio(){
+    @NeedsPermission({Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE})
+    public void initAudio() {
         recBufSize = AudioRecord.getMinBufferSize(FREQUENCY,
                 CHANNELCONGIFIGURATION, AUDIOENCODING);// 录音组件
         audioRecord = new AudioRecord(AUDIO_SOURCE,// 指定音频来源，这里为麦克风
@@ -214,10 +226,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-
-    @OnShowRationale({Manifest.permission.RECORD_AUDIO,Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE})
-    void showRationaleForRecord(final PermissionRequest request){
+    @OnShowRationale({Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE})
+    void showRationaleForRecord(final PermissionRequest request) {
         new AlertDialog.Builder(this)
                 .setPositiveButton("好的", new DialogInterface.OnClickListener() {
                     @Override
@@ -236,12 +246,12 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    @OnPermissionDenied({Manifest.permission.RECORD_AUDIO,Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE})
-    void showRecordDenied(){
-        Toast.makeText(MainActivity.this,"拒绝录音权限将无法进行挑战",Toast.LENGTH_LONG).show();
+    @OnPermissionDenied({Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE})
+    void showRecordDenied() {
+        Toast.makeText(MainActivity.this, "拒绝录音权限将无法进行挑战", Toast.LENGTH_LONG).show();
     }
 
-    @OnNeverAskAgain({Manifest.permission.RECORD_AUDIO,Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.READ_EXTERNAL_STORAGE})
+    @OnNeverAskAgain({Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE})
     void onRecordNeverAskAgain() {
         new AlertDialog.Builder(this)
                 .setPositiveButton("确定", new DialogInterface.OnClickListener() {
@@ -265,7 +275,10 @@ public class MainActivity extends AppCompatActivity {
     private int mPlayStartMsec;
     private int mPlayEndMsec;
     private final int UPDATE_WAV = 100;
-    /**播放音频，@param startPosition 开始播放的时间*/
+
+    /**
+     * 播放音频，@param startPosition 开始播放的时间
+     */
     private synchronized void onPlay(int startPosition) {
         if (mPlayer == null)
             return;
@@ -273,47 +286,67 @@ public class MainActivity extends AppCompatActivity {
             mPlayer.pause();
             updateTime.removeMessages(UPDATE_WAV);
         }
-            mPlayStartMsec = waveView.pixelsToMillisecs(startPosition);
-            mPlayEndMsec = waveView.pixelsToMillisecsTotal();
-            mPlayer.setOnCompletionListener(new SamplePlayer.OnCompletionListener() {
-                @Override
-                public void onCompletion() {
-                    waveView.setPlayback(-1);
-                    updateDisplay();
-                    updateTime.removeMessages(UPDATE_WAV);
-                    Toast.makeText(getApplicationContext(),"播放完成",Toast.LENGTH_LONG).show();
-                }
-            });
-            mPlayer.seekTo(mPlayStartMsec);
-            mPlayer.start();
-            Message msg = new Message();
-            msg.what = UPDATE_WAV;
-            updateTime.sendMessage(msg);
+        playBtn.setText("停止播放");
+        mPlayStartMsec = waveView.pixelsToMillisecs(startPosition);
+        mPlayEndMsec = waveView.pixelsToMillisecsTotal();
+        mPlayer.setOnCompletionListener(new SamplePlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion() {
+                Log.d(TAG, "onCompletion: " + "播放完成");
+                playBtn.setText("播放录音");
+                waveView.setPlayback(-1);
+                updateDisplay();
+                updateTime.removeMessages(UPDATE_WAV);
+                Toast.makeText(getApplicationContext(), "播放完成", Toast.LENGTH_LONG).show();
+            }
+        });
+        mPlayer.seekTo(mPlayStartMsec);
+        mPlayer.start();
+        Message msg = new Message();
+        msg.what = UPDATE_WAV;
+        updateTime.sendMessage(msg);
+    }
+
+    /**
+     * 暂停播放音频
+     */
+    private synchronized void onPausePlayer() {
+        if (mPlayer == null)
+            return;
+        if (mPlayer != null && mPlayer.isPlaying()) {
+            mPlayer.pause();
+            updateTime.removeMessages(UPDATE_WAV);
+            playBtn.setText("播放录音");
+        }
     }
 
     Handler updateTime = new Handler() {
         public void handleMessage(Message msg) {
             updateDisplay();
             updateTime.sendMessageDelayed(new Message(), 10);
-        };
+        }
+
+        ;
     };
 
-    /**更新upd
-     * ateview 中的播放进度*/
+    /**
+     * 更新upd
+     * ateview 中的播放进度
+     */
     private void updateDisplay() {
-            int now = mPlayer.getCurrentPosition();// nullpointer
-            int frames = waveView.millisecsToPixels(now);
-            waveView.setPlayback(frames);//通过这个更新当前播放的位置
-            if (now >= mPlayEndMsec ) {
-                waveView.setPlayFinish(1);
-                if (mPlayer != null && mPlayer.isPlaying()) {
-                    mPlayer.pause();
-                    updateTime.removeMessages(UPDATE_WAV);
-                }
-            }else{
-                waveView.setPlayFinish(0);
+        int now = mPlayer.getCurrentPosition();// nullpointer
+        int frames = waveView.millisecsToPixels(now);
+        waveView.setPlayback(frames);//通过这个更新当前播放的位置
+        if (now >= mPlayEndMsec) {
+            waveView.setPlayFinish(1);
+            if (mPlayer != null && mPlayer.isPlaying()) {
+                mPlayer.pause();
+                updateTime.removeMessages(UPDATE_WAV);
             }
-            waveView.invalidate();//刷新真个视图
+        } else {
+            waveView.setPlayFinish(0);
+        }
+        waveView.invalidate();//刷新真个视图
     }
 
 
